@@ -11,46 +11,69 @@ int errF;
 
 FILE *fout;
 
-void expression(void) {
+Node* statement(void){
 	Kind op;
 
-	term();
+	Node* node = expression();
+	while(token.kind == '='){
+		op = token.kind;
+		token = nextTkn();
+		node = new_node(op, node, expression());
+	}
+	return node;
+}
+
+Node* expression(void) {
+	Kind op;
+
+	Node* node = term();
 	while (token.kind == Plus || token.kind == Minus) {
 		op = token.kind;
 		token = nextTkn();
-		term();
-		gen_binary(op);
-		//‰ÁŒ¸ŽZ‰‰ŽZ
+		if (token.kind == Plus) {
+			node = new_node(op,node,term());
+		}else if (token.kind == Minus) {
+			node = new_node(op,node,term());
+		}
 	}
+	return node;
 }
-void term(void) {
+
+Node* term(void) {
 	Kind op;
 
-	factor();
+	Node* node = factor();
 	while (token.kind == Multi || token.kind == Divi) {
 		op = token.kind;
 		token = nextTkn();
-		factor();
-		gen_binary(op);
-		//æœŽZ‰‰ŽZ
+		if (token.kind == Multi) {
+			node = new_node(op, node, factor());
+		}else if (token.kind == Divi) {
+			node = new_node(op, node, factor());
+		}
 	}
+	return node;
 }
 
-void factor(void) {
+Node* factor(void) {
+	Node* node;
 	switch (token.kind) {
-	case IntNum:
-		gen_mov(token.intVal);
-		gen_push(token.intVal);
-		break;
+	case IntNum: //æ•´æ•°
+		node = new_node_num(token.kind,token.intVal);
+		token = nextTkn();
+		return node;
 	case Lparen:
 		token = nextTkn();
-		expression();
+		node = expression();
 		chkTkn(Rparen);
-		break;
+		return node;
+	case Ident: //å¤‰æ•°
+		node = new_node_num(token.kind, token.intVal);
+		token = nextTkn();
+		return node;
 	default:
 		if (token.kind == EofTkn) errF = 1;
 	}
-	token = nextTkn();
 }
 
 void chkTkn(Kind op) {
@@ -59,24 +82,79 @@ void chkTkn(Kind op) {
 	}
 }
 
+Node* new_node(Kind kind, Node* lhs, Node* rhs) {
+	Node* node = (Node*)calloc(1, sizeof(Node));
+	node->kind = kind;
+	node->lhs = lhs;
+	node->rhs = rhs;
+	return node;
+}
+
+Node* new_node_num(Kind kind, int val) {
+	Node* node = (Node*)calloc(1, sizeof(Node));
+	node->kind = IntNum;
+	node->val = val;
+	return node;
+}
+
+void printNode(Node* node) {
+	if (node->kind == IntNum) {
+		printf("%d\n", node->val);
+	}
+
+	printNode(node->lhs);
+	printNode(node->rhs);
+
+	switch (node->kind) {
+	case Plus:
+		printf("Plus\n");
+		break;
+	case Minus:
+		printf("Minus\n");
+		break;
+	case Multi:
+		printf("Multi\n");
+		break;
+	case Divi:
+		printf("Divi\n");
+		break;
+	case '=':
+		printf("equal\n");
+		break;
+	case Ident://å¤‰æ•°
+		printf("variable\n");
+		break;
+	case Lparen:
+		printf("Lparen\n");
+		break;
+	case Rparen:
+		printf("Rparen\n");
+		break;
+	}
+}
+
+
 int main (int argc, char *argv[]){
 	if(argc == 1) exit(1);
 	if((fin  = fopen(argv[1], "r")) == NULL) exit(1);
 	if((fout = fopen(argv[2], "w")) == NULL) exit(1);
 	
+	Node* node;
+
 	init_chtyp();
 	printf("text       kind intval\n");
 	
 	compile();
 
 	for(token = nextTkn(); token.kind != EofTkn;){
-		expression();
+		node = statement();
 		if(errF) puts("---err---");
 	}
 	
+	printNode(node);
+
 	printf("end_compile\n");
 	end_compile();
 
 	return 0;
 }
-
